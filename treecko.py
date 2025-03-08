@@ -5,8 +5,7 @@ import subprocess
 import time
 import sys
 
-# Global reset counter
-reset_count = 0
+reset_count = 0  # Counter for the number of resets
 
 def get_mgba_window():
     """Finds and focuses on the mGBA window."""
@@ -32,23 +31,30 @@ def capture_mgba_screen():
         screenshot = np.array(sct.grab({"left": x, "top": y, "width": width, "height": height}))
         return cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
 
-def is_battle_screen():
-    """Checks if the battle screen is displayed."""
+def is_screen_present(template_path, threshold=0.9):
+    """Checks if a specific screen (image) is currently displayed."""
     screenshot = capture_mgba_screen()
     if screenshot is None:
         return False
-    battle_template = cv2.imread("battle.png")
-    if battle_template is None:
-        print("Battle template image not found!")
+    template = cv2.imread(template_path)
+    if template is None:
+        print(f"Template image {template_path} not found!")
         return False
     
-    result = cv2.matchTemplate(screenshot, battle_template, cv2.TM_CCOEFF_NORMED)
+    result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, _ = cv2.minMaxLoc(result)
-    return max_val > 0.9
+    return max_val > threshold
+
+def wait_for_screen(template_path, description):
+    """Waits until a given screen appears before proceeding."""
+    print(f"Waiting for {description} screen...")
+    while not is_screen_present(template_path):
+        time.sleep(0.1)
+    print(f"{description} screen detected!")
 
 def scan_screen_for_treecko():
     """Scans the screen for Treecko only if in battle."""
-    if not is_battle_screen():
+    if not is_screen_present("battle.png"):
         return
     
     screenshot = capture_mgba_screen()
@@ -88,19 +94,19 @@ def press_key(key):
 def reset_game():
     """Resets the game and starts a new encounter."""
     global reset_count
-    reset_count += 1  # Increment counter
-    print(f"Resetting game... (Attempt #{reset_count})")
+    reset_count += 1  # Increment reset counter
+    print(f"Resetting game... (Total resets: {reset_count})")
     
     get_mgba_window()  # Ensure game window is in focus
     press_key("ctrl+r")
-
-    print("Waiting for game to reset...")
-    time.sleep(4)
+    
+    # Wait for the intro screen to appear
+    wait_for_screen("intro.png", "intro")
     
     # Intro sequence
     press_key("x")
     print("Pressing x...")
-    time.sleep(2)
+    time.sleep(1)
     press_key("x")
     print("Pressing x...")
     time.sleep(2)
@@ -110,8 +116,10 @@ def reset_game():
     press_key("x")
     print("Pressing x...")
     
-    print("Waiting for game to load...")
-    time.sleep(3)
+    print("Waiting for bag selection screen...")
+    
+    # Wait for the bag selection screen
+    wait_for_screen("bag.png", "bag")
     
     # Navigating bag selection
     press_key("x")
@@ -125,13 +133,16 @@ def reset_game():
     time.sleep(1)
     press_key("x")
     print("Pressing x...")
-    print("Waiting for battle to start...")
-    time.sleep(8)
-    press_key("x")  # Send in Treecko
+    
+    # Wait for the "send Treecko in" screen
+    wait_for_screen("send.png", "send Treecko in")
+    
+    # Send Treecko into battle
+    press_key("x")
     print("Sending Treecko in...")
     
-    while not is_battle_screen():
-        time.sleep(3)  # Wait until battle starts
+    while not is_screen_present("battle.png"):
+        time.sleep(0.1)  # Wait until battle starts
     
     scan_screen_for_treecko()
 
@@ -139,4 +150,4 @@ if __name__ == "__main__":
     reset_game()  # Ensure a proper start before sequence begins
     while True:
         scan_screen_for_treecko()
-        time.sleep(1)
+        time.sleep(0.1)
