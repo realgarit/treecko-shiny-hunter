@@ -73,8 +73,8 @@ def scan_screen_for_treecko():
     if screenshot is None:
         return
     
-    treecko_normal = cv2.imread("treecko_shiny.png")
-    treecko_shiny = cv2.imread("treecko_normal.png")
+    treecko_normal = cv2.imread("treecko_normal.png")
+    treecko_shiny = cv2.imread("treecko_shiny.png")
     
     if treecko_normal is None or treecko_shiny is None:
         print("Treecko template images not found!")
