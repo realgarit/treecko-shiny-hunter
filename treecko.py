@@ -4,8 +4,20 @@ import mss
 import subprocess
 import time
 import sys
+import requests  # Added for Discord webhook
 
 reset_count = 0  # Counter for the number of resets
+
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your_webhook_url" # Replace with your Discord webhook URL
+
+def send_discord_notification():
+    """Sends a Discord notification when a shiny Treecko is found."""
+    data = {"content": f"🔥 **Shiny Treecko found!** 🟢 Total resets: {reset_count} 🚀"}
+    response = requests.post(DISCORD_WEBHOOK_URL, json=data)
+    if response.status_code == 204:
+        print("Discord notification sent successfully!")
+    else:
+        print(f"Failed to send Discord notification. Status code: {response.status_code}")
 
 def get_mgba_window():
     """Finds and focuses on the mGBA window."""
@@ -61,8 +73,8 @@ def scan_screen_for_treecko():
     if screenshot is None:
         return
     
-    treecko_normal = cv2.imread("treecko_normal.png")
-    treecko_shiny = cv2.imread("treecko_shiny.png")
+    treecko_normal = cv2.imread("treecko_shiny.png")
+    treecko_shiny = cv2.imread("treecko_normal.png")
     
     if treecko_normal is None or treecko_shiny is None:
         print("Treecko template images not found!")
@@ -77,6 +89,7 @@ def scan_screen_for_treecko():
     if max_val_shiny > 0.9:
         print(f"Shiny Treecko detected at {max_loc_shiny} with confidence {max_val_shiny}!")
         subprocess.run(["notify-send", "Shiny Treecko found!"])
+        send_discord_notification()  # Send Discord notification
         sys.exit("Shiny found! Stopping script.")
     elif max_val_normal > 0.9:
         print(f"Normal Treecko detected at {max_loc_normal} with confidence {max_val_normal}")
