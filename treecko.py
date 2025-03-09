@@ -7,23 +7,34 @@ import sys
 import requests  # Added for Discord webhook
 import os
 import logging
+import threading
+from logging.handlers import RotatingFileHandler
 
-# Set up logging
+# Set up logging with log rotation
 log_file = os.path.expanduser("~/Downloads/treecko_hunt.log")
-logging.basicConfig(
-    filename=log_file,
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
+handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=3)  # Max 5MB per file, 3 backups
+handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+
+# Thread-local storage to prevent recursive logging
+thread_local = threading.local()
+thread_local.is_logging = False  # Track if we are already logging
 
 reset_count = 0  # Counter for the number of resets
 
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your_webhook_url"  # Replace with your Discord webhook URL
 
 def log_message(message):
-    """Logs message to file only (no terminal output)."""
-    logging.info(message)
+    """Logs message safely, preventing recursive calls."""
+    if getattr(thread_local, "is_logging", False):
+        return  # Prevent infinite recursion
+    
+    try:
+        thread_local.is_logging = True  # Mark logging as in progress
+        logging.info(message)
+    finally:
+        thread_local.is_logging = False  # Reset flag after logging
 
 def send_discord_notification():
     """Sends a Discord notification when a shiny Treecko is found."""
