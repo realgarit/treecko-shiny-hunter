@@ -7,55 +7,53 @@ import sys
 import requests  # Added for Discord webhook
 import os
 import logging
-import threading
-from logging.handlers import RotatingFileHandler
 
-# Set up logging with log rotation
+# Set up logging
 log_file = os.path.expanduser("~/Downloads/treecko_hunt.log")
-handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=3)  # Max 5MB per file, 3 backups
-handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
-
-logging.basicConfig(level=logging.INFO, handlers=[handler])
-
-# Thread-local storage to prevent recursive logging
-thread_local = threading.local()
-thread_local.is_logging = False  # Track if we are already logging
+logging.basicConfig(
+    filename=log_file,
+    level=logging.INFO,
+    format="%(asctime)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 reset_count = 0  # Counter for the number of resets
 
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your_webhook_url"  # Replace with your Discord webhook URL
 
 def log_message(message):
-    """Logs message safely, preventing recursive calls."""
-    if getattr(thread_local, "is_logging", False):
-        return  # Prevent infinite recursion
-    
+    """Logs messages to the file only, preventing recursive logging errors."""
     try:
-        thread_local.is_logging = True  # Mark logging as in progress
         logging.info(message)
-    finally:
-        thread_local.is_logging = False  # Reset flag after logging
+    except Exception as e:
+        print(f"Logging Error: {e}")  # Fallback to terminal to avoid recursion
 
 def send_discord_notification():
     """Sends a Discord notification when a shiny Treecko is found."""
     data = {"content": f"🔥 **Shiny Treecko found!** 🟢 Total resets: {reset_count} 🚀"}
-    response = requests.post(DISCORD_WEBHOOK_URL, json=data)
-    if response.status_code == 204:
-        log_message("Discord notification sent successfully!")
-    else:
-        log_message(f"Failed to send Discord notification. Status code: {response.status_code}")
+    try:
+        response = requests.post(DISCORD_WEBHOOK_URL, json=data)
+        if response.status_code == 204:
+            log_message("Discord notification sent successfully!")
+        else:
+            log_message(f"Failed to send Discord notification. Status code: {response.status_code}")
+    except Exception as e:
+        log_message(f"Error sending Discord notification: {e}")
 
 def get_mgba_window():
     """Finds and focuses on the mGBA window."""
-    output = subprocess.check_output(["wmctrl", "-lG"]).decode()
-    for line in output.splitlines():
-        if "mGBA - 0.10.4" in line:
-            parts = line.split()
-            x, y, width, height = map(int, parts[2:6])
-            window_id = parts[0]
-            subprocess.run(["wmctrl", "-i", "-a", window_id])  # Bring mGBA to focus
-            time.sleep(0.5)  # Ensure focus before proceeding
-            return x, y, width, height
+    try:
+        output = subprocess.check_output(["wmctrl", "-lG"]).decode()
+        for line in output.splitlines():
+            if "mGBA - 0.10.4" in line:
+                parts = line.split()
+                x, y, width, height = map(int, parts[2:6])
+                window_id = parts[0]
+                subprocess.run(["wmctrl", "-i", "-a", window_id])  # Bring mGBA to focus
+                time.sleep(0.5)  # Ensure focus before proceeding
+                return x, y, width, height
+    except Exception as e:
+        log_message(f"Error getting mGBA window: {e}")
     return None
 
 def capture_mgba_screen():
@@ -126,9 +124,12 @@ def scan_screen_for_treecko():
 
 def press_key(key):
     """Presses and releases a key using xdotool."""
-    subprocess.run(["xdotool", "keydown", key])
-    time.sleep(0.1)
-    subprocess.run(["xdotool", "keyup", key])
+    try:
+        subprocess.run(["xdotool", "keydown", key])
+        time.sleep(0.1)
+        subprocess.run(["xdotool", "keyup", key])
+    except Exception as e:
+        log_message(f"Error pressing key {key}: {e}")
 
 def reset_game():
     """Resets the game and starts a new encounter."""
