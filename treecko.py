@@ -4,7 +4,7 @@ import mss
 import subprocess
 import time
 import sys
-import requests  # Added for Discord webhook
+import requests
 import os
 import logging
 
@@ -17,47 +17,34 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-reset_count = 0  # Counter for the number of resets
+reset_count = 0  # Reset counter
 
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your_webhook_url"  # Replace with your Discord webhook URL
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/your_webhook_url_here"
 
 def log_message(message):
-    """Logs messages to the file only, preventing recursive logging errors."""
-    try:
-        logging.info(message)
-    except Exception as e:
-        print(f"Logging Error: {e}")  # Fallback to terminal to avoid recursion
+    logging.info(message)
 
 def send_discord_notification():
-    """Sends a Discord notification when a shiny Treecko is found."""
     data = {"content": f"🔥 **Shiny Treecko found!** 🟢 Total resets: {reset_count} 🚀"}
-    try:
-        response = requests.post(DISCORD_WEBHOOK_URL, json=data)
-        if response.status_code == 204:
-            log_message("Discord notification sent successfully!")
-        else:
-            log_message(f"Failed to send Discord notification. Status code: {response.status_code}")
-    except Exception as e:
-        log_message(f"Error sending Discord notification: {e}")
+    response = requests.post(DISCORD_WEBHOOK_URL, json=data)
+    if response.status_code == 204:
+        log_message("Discord notification sent successfully!")
+    else:
+        log_message(f"Failed to send Discord notification. Status: {response.status_code}")
 
 def get_mgba_window():
-    """Finds and focuses on the mGBA window."""
-    try:
-        output = subprocess.check_output(["wmctrl", "-lG"]).decode()
-        for line in output.splitlines():
-            if "mGBA - 0.10.4" in line:
-                parts = line.split()
-                x, y, width, height = map(int, parts[2:6])
-                window_id = parts[0]
-                subprocess.run(["wmctrl", "-i", "-a", window_id])  # Bring mGBA to focus
-                time.sleep(0.5)  # Ensure focus before proceeding
-                return x, y, width, height
-    except Exception as e:
-        log_message(f"Error getting mGBA window: {e}")
+    output = subprocess.check_output(["wmctrl", "-lG"]).decode()
+    for line in output.splitlines():
+        if "mGBA - 0.10.4" in line:
+            parts = line.split()
+            x, y, width, height = map(int, parts[2:6])
+            window_id = parts[0]
+            subprocess.run(["wmctrl", "-i", "-a", window_id])
+            time.sleep(0.5)
+            return x, y, width, height
     return None
 
 def capture_mgba_screen():
-    """Captures only the mGBA window."""
     window = get_mgba_window()
     if not window:
         log_message("mGBA window not found!")
@@ -68,7 +55,6 @@ def capture_mgba_screen():
         return cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
 
 def is_screen_present(template_path, threshold=0.9):
-    """Checks if a specific screen (image) is currently displayed."""
     screenshot = capture_mgba_screen()
     if screenshot is None:
         return False
@@ -76,119 +62,89 @@ def is_screen_present(template_path, threshold=0.9):
     if template is None:
         log_message(f"Template image {template_path} not found!")
         return False
-    
     result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, _ = cv2.minMaxLoc(result)
     return max_val > threshold
 
 def wait_for_screen(template_path, description):
-    """Waits until a given screen appears before proceeding."""
     log_message(f"Waiting for {description} screen...")
     while not is_screen_present(template_path):
         time.sleep(0.1)
     log_message(f"{description} screen detected!")
 
-def scan_screen_for_treecko():
-    """Scans the screen for Treecko only if in battle."""
-    if not is_screen_present("battle.png"):
-        return
-    
-    screenshot = capture_mgba_screen()
-    if screenshot is None:
-        return
-    
-    treecko_normal = cv2.imread("treecko_normal.png")
-    treecko_shiny = cv2.imread("treecko_shiny.png")
-    
-    if treecko_normal is None or treecko_shiny is None:
-        log_message("Treecko template images not found!")
-        return
-    
-    result_normal = cv2.matchTemplate(screenshot, treecko_normal, cv2.TM_CCOEFF_NORMED)
-    result_shiny = cv2.matchTemplate(screenshot, treecko_shiny, cv2.TM_CCOEFF_NORMED)
-    
-    _, max_val_normal, _, max_loc_normal = cv2.minMaxLoc(result_normal)
-    _, max_val_shiny, _, max_loc_shiny = cv2.minMaxLoc(result_shiny)
-    
-    if max_val_shiny > 0.9:
-        log_message(f"Shiny Treecko detected at {max_loc_shiny} with confidence {max_val_shiny}!")
-        subprocess.run(["notify-send", "Shiny Treecko found!"])
-        send_discord_notification()  # Send Discord notification
-        sys.exit("Shiny found! Stopping script.")
-    elif max_val_normal > 0.9:
-        log_message(f"Normal Treecko detected at {max_loc_normal} with confidence {max_val_normal}")
-        log_message("Normal Treecko detected, resetting game...")
-        reset_game()  # Ensure game resets after detecting a normal Treecko
-    else:
-        log_message("Treecko not detected.")
-
 def press_key(key):
-    """Presses and releases a key using xdotool."""
-    try:
-        subprocess.run(["xdotool", "keydown", key])
-        time.sleep(0.1)
-        subprocess.run(["xdotool", "keyup", key])
-    except Exception as e:
-        log_message(f"Error pressing key {key}: {e}")
+    subprocess.run(["xdotool", "keydown", key])
+    time.sleep(0.1)
+    subprocess.run(["xdotool", "keyup", key])
 
 def reset_game():
-    """Resets the game and starts a new encounter."""
     global reset_count
-    reset_count += 1  # Increment reset counter
+    reset_count += 1
     log_message(f"Resetting game... (Total resets: {reset_count})")
-    
-    get_mgba_window()  # Ensure game window is in focus
+
+    get_mgba_window()
     press_key("ctrl+r")
-    
-    # Wait for the intro screen to appear
+
     wait_for_screen("intro.png", "intro")
-    
-    # Intro sequence
+
     press_key("x")
-    log_message("Pressing x...")
     time.sleep(1)
     press_key("x")
-    log_message("Pressing x...")
     time.sleep(2)
     press_key("x")
-    log_message("Pressing x...")
     time.sleep(3)
     press_key("x")
-    log_message("Pressing x...")
-    
-    log_message("Waiting for bag selection screen...")
-    
-    # Wait for the bag selection screen
+
     wait_for_screen("bag.png", "bag")
-    
-    # Navigating bag selection
+
     press_key("x")
-    log_message("Pressing x...")
     time.sleep(1)
     press_key("Left")
-    log_message("Pressing left...")
     time.sleep(1)
     press_key("x")
-    log_message("Pressing x...")
     time.sleep(1)
     press_key("x")
-    log_message("Pressing x...")
-    
-    # Wait for the "send Treecko in" screen
+
     wait_for_screen("send.png", "send Treecko in")
-    
-    # Send Treecko into battle
+
     press_key("x")
     log_message("Sending Treecko in...")
-    
-    while not is_screen_present("battle.png"):
-        time.sleep(0.1)  # Wait until battle starts
-    
-    scan_screen_for_treecko()
 
 if __name__ == "__main__":
     log_message("Treecko Shiny Hunting Bot Started.")
-    reset_game()  # Ensure a proper start before sequence begins
+
     while True:
-        scan_screen_for_treecko()
+        reset_game()
+
+        while not is_screen_present("battle.png"):
+            time.sleep(0.1)
+
+        screenshot = capture_mgba_screen()
+        if screenshot is None:
+            continue
+
+        treecko_normal = cv2.imread("treecko_normal.png")
+        treecko_shiny = cv2.imread("treecko_shiny.png")
+
+        if treecko_normal is None or treecko_shiny is None:
+            log_message("Treecko template images not found!")
+            continue
+
+        result_normal = cv2.matchTemplate(screenshot, treecko_normal, cv2.TM_CCOEFF_NORMED)
+        result_shiny = cv2.matchTemplate(screenshot, treecko_shiny, cv2.TM_CCOEFF_NORMED)
+
+        _, max_val_normal, _, max_loc_normal = cv2.minMaxLoc(result_normal)
+        _, max_val_shiny, _, max_loc_shiny = cv2.minMaxLoc(result_shiny)
+
+        if max_val_shiny > 0.9:
+            log_message(f"Shiny Treecko detected at {max_loc_shiny} with confidence {max_val_shiny}!")
+            subprocess.run(["notify-send", "Shiny Treecko found!"])
+            send_discord_notification()
+            sys.exit("Shiny found! Stopping script.")
+        elif max_val_normal > 0.9:
+            log_message(f"Normal Treecko detected at {max_loc_normal} with confidence {max_val_normal}")
+            log_message("Normal Treecko detected, restarting...")
+        else:
+            log_message("Treecko not detected.")
+
         time.sleep(0.1)
