@@ -7,6 +7,7 @@ import sys
 import requests
 import os
 import logging
+import random
 
 # Set up logging
 log_file = os.path.expanduser("~/Downloads/treecko_hunt.log")
@@ -82,6 +83,12 @@ def reset_game():
     reset_count += 1
     log_message(f"Resetting game... (Total resets: {reset_count})")
 
+    # Randomized wait to help alter RNG
+    random_wait = random.uniform(0.5, 6.0)
+    log_message(f"Randomized pre-reset wait: {random_wait:.2f} seconds")
+
+    time.sleep(random_wait)
+
     get_mgba_window()
     press_key("ctrl+r")
 
@@ -96,6 +103,8 @@ def reset_game():
     press_key("x")
 
     wait_for_screen("bag.png", "bag")
+
+    time.sleep(random_wait)
 
     press_key("x")
     time.sleep(1)
